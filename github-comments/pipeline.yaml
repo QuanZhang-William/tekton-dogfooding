@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: send-basic-comment-github
+spec:
+  description: |
+    This pipeline just post a comment to a github pr when receiving a comment
+  params:
+    - name: REQUEST_URL
+    - name: COMMENT_OR_FILE
+  tasks:
+  - name: post-message
+    taskRef:
+      resolver: hub
+      params:
+      - name: kind
+        value: task
+      - name: name
+        value: github-add-comment
+      - name: version
+        value: "0.7"
+    params:
+    - name: REQUEST_URL
+      value: $(params.REQUEST_URL)
+    - name: COMMENT_OR_FILE
+      value: $(params.COMMENT_OR_FILE)

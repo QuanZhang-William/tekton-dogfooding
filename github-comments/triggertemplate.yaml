@@ -1,0 +1,21 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: send-basic-comment-github-template
+spec:
+  params:
+  - name: echo_text
+    default: This is a comment from Tekton CI
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: send-basic-comment-github-run
+    spec:
+      pipelineRef:
+        name: send-basic-comment-github
+      params:
+      - name: REQUEST_URL
+        value: https://github.com/QuanZhang-William/ah-test-catalog-git-versioning/pull/1
+      - name: COMMENT_OR_FILE
+        value: $(tt.params.echo_text)

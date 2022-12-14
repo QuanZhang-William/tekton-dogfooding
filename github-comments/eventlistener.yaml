@@ -1,0 +1,70 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: send-basic-comment-github-event-listener
+spec:
+  triggers:
+    - name: send-basic-comment-github-trigger-with-interceptors
+      interceptors:
+      - ref:  # This interceptor filters the event types
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["pull_request_review_comment", "issue_comment"]
+        - name: "secretRef" # It filters the source of webhook
+          value:
+            secretName: github-secret
+            secretKey: secretToken
+      - ref:  # This interceptor filters the comment prefix
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.comment.body.truncate(10) == '/quan-test'"
+      bindings: # Use a binding here to respond corresponding message
+      - name: echo_text
+        value: quans CI echo message
+      template:
+        ref: send-basic-comment-github-template
+    - name: pull-build-test-trigger-with-interceptors
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["issue_comment"]
+        - name: "secretRef"
+          value:
+            secretName: github-secret
+            secretKey: secretToken
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.comment.body.truncate(16) == '/pull-build-test'"
+      template:
+        ref: send-basic-comment-github-template
+    - name: pull-integration-test-trigger-with-interceptors
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["issue_comment"]
+        - name: "secretRef"
+          value:
+            secretName: github-secret
+            secretKey: secretToken
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.comment.body.truncate(22) == '/pull-integration-test'"
+      template:
+        ref: send-basic-comment-github-template
+  resources:
+    kubernetesResource:
+      serviceType: LoadBalancer
+      spec:
+        template:
+          spec:
+            serviceAccountName: send-basic-comment-github-sa
