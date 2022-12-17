@@ -1,0 +1,74 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: create-basic-check-github
+spec:
+  description: |
+    This pipeline 1)first generate(sign) JWT; 2) start a github check; 3) update a github check
+  workspaces:
+  - name: github-app-secret
+  params:
+  - name: repo-full-name
+  - name: git-sha
+  - name: check-run-name
+  tasks:
+  - name: generate-token
+    taskRef:
+      resolver: hub
+      params:
+      - name: kind
+        value: task
+      - name: name
+        value: github-app-token
+      - name: version
+        value: "0.2"
+    params:
+    - name: application_id
+      value: "273118"
+    - name: installation_id
+      value: "32269096"
+    workspaces:
+    - name: secrets
+      workspace: github-app-secret
+  - name: start-github-check
+    taskRef:
+      name: update-github-check-run
+    params:
+    - name: repo-full-name
+      value: $(params.repo-full-name)
+    - name: git-sha
+      value: $(params.git-sha)
+    - name: status
+      value: in_progress
+    - name: check-run-name
+      value: $(params.check-run-name)
+    - name: jwt-token
+      value: $(tasks.generate-token.results.token)
+  - name: running-tests
+    taskSpec:
+      results:
+        - name: test-result
+          description: This is the result of running test
+      steps:
+        - name: print-result
+          image: bash:latest
+          script: |
+            #!/usr/bin/env bash
+            sleep 30s
+            echo -n "Succeeded" > $(results.test-result.path)
+  - name: update-github-check
+    taskRef:
+      name: update-github-check-run
+    params:
+    - name: repo-full-name
+      value: $(params.repo-full-name)
+    - name: git-sha
+      value: $(params.git-sha)
+    - name: status
+      value: completed
+    - name: conclusion
+      value: $(tasks.running-tests.results.test-result)
+    - name: check-run-name
+      value: $(params.check-run-name)
+    - name: jwt-token
+      value: $(tasks.generate-token.results.token)

@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: update-github-check-run
+spec:
+  params:
+  - name: externalid
+    default: ""
+  - name: repo-full-name
+  - name: git-sha
+  - name: status
+    default: "in_progress"
+  - name: conclusion 
+    description: "Allowed values are 'Succeeded', 'Failed', and 'None'"
+    default: None
+  - name: check-run-name
+  - name: jwt-token
+  steps:
+  - name: update-check-run
+    image: curlimages/curl:latest
+    command:
+    - sh
+    args:
+    - -ce
+    - |
+      set -e
+      TOKEN=$(params.jwt-token)
+      NOW=$(date +"%Y-%m-%dT%TZ")
+      if [ "$(params.conclusion)" == "Succeeded" ]
+      then
+        CONCLUSION="success"
+      elif [ "$(params.conclusion)" == "Failed" ]
+      then
+        CONCLUSION="failure"
+      else
+        CONCLUSION="skipped"
+      fi
+      if [ "$(params.status)" == "completed" ]
+      then
+        BODY="{\"name\":\"$(params.check-run-name)\",\"head_sha\":\"$(params.git-sha)\",\"conclusion\":\"$CONCLUSION\",\"completed_at\":\"$NOW\",\"status\":\"$(params.status)\",\"external_id\":\"$(params.externalid)\"}"
+      else
+        BODY='{"name":"$(params.check-run-name)","head_sha":"$(params.git-sha)","status":"$(params.status)","external_id":"$(params.externalid)"}'
+      fi
+      echo "Posting status to Github"
+      curl -i -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/vnd.github+json" \
+      https://api.github.com/repos/$(params.repo-full-name)/check-runs -d ${BODY}

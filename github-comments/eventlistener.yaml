@@ -61,6 +61,29 @@ spec:
           value: "body.comment.body.truncate(22) == '/pull-integration-test'"
       template:
         ref: send-basic-comment-github-template
+    - name: open-pr-check-trigger
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["pull_request"]
+        - name: "secretRef"
+          value:
+            secretName: github-app-webhook-secret
+            secretKey: secretToken
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.action == 'opened'"
+      template:
+        ref: send-github-check-template
+      bindings: # Use a binding here to respond corresponding message
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.pull_request.head.sha)
   resources:
     kubernetesResource:
       serviceType: LoadBalancer
