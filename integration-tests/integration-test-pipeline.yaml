@@ -1,0 +1,130 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: catalog-integration-test-pipeline
+spec:
+  description: |
+    This pipeline 1)first generate(sign) JWT; 
+    2) start a github check; 
+    3) clone the target repo; 
+    4) run e2e test scripts in the target repo;
+    5) update a github check
+  workspaces:
+  - name: github-app-secret
+  - name: sources
+    description: Workspace where the git repo is prepared for testing
+  params:
+  - name: repo-full-name
+  - name: git-sha
+  - name: check-run-name
+  - name: pullRequestNumber
+    description: The pullRequestNumber
+  - name: pullRequestBaseRef
+    description: The pull request base branch
+  - name: gitRepository
+    description: The git repository that hosts context and Dockerfile
+  - name: k8s-version
+    type: string
+    description: The version of k8s (e.g. v1.21.x, v1.22.x or v1.23.x)
+  - name: e2e-script
+    type: string
+    description: the path to the e2e script in the sources
+    default: "test/e2e-tests.sh"
+  - name: e2e-env
+    type: string
+    description: |
+      the path to an env file that is loaded before the execution
+      of the e2e-script
+    default: ""
+  tasks:
+  - name: generate-token
+    taskRef:
+      resolver: hub
+      params:
+      - name: kind
+        value: task
+      - name: name
+        value: github-app-token
+      - name: version
+        value: "0.2"
+    params:
+    - name: application_id
+      value: "273118"
+    - name: installation_id
+      value: "32269096"
+    workspaces:
+    - name: secrets
+      workspace: github-app-secret
+  - name: start-github-check
+    taskRef:
+      name: update-github-check-run
+    params:
+    - name: repo-full-name
+      value: $(params.repo-full-name)
+    - name: git-sha
+      value: $(params.git-sha)
+    - name: status
+      value: in_progress
+    - name: check-run-name
+      value: $(params.check-run-name)
+    - name: jwt-token
+      value: $(tasks.generate-token.results.token)
+  - name: clone-repo
+    taskRef:
+      resolver: hub
+      params:
+      - name: name
+        value: git-batch-merge
+      - name: version
+        value: "0.2"
+    params:
+      - name: url
+        value: $(params.gitRepository)
+      - name: mode
+        value: "merge"
+      - name: revision
+        value: $(params.pullRequestBaseRef)
+      - name: refspec
+        value: refs/heads/$(params.pullRequestBaseRef):refs/heads/$(params.pullRequestBaseRef)
+      - name: batchedRefs
+        value: "refs/pull/$(params.pullRequestNumber)/head"
+    workspaces:
+      - name: output
+        workspace: sources
+  - name: e2e-tests
+    runAfter: ['clone-repo']
+    taskRef:
+      name: kind-e2e
+    params:
+    - name: arguments
+      value:
+        - --k8s-version
+        - "$(params.k8s-version)"
+        - --cluster-suffix
+        - "$(params.pullRequestNumber)"
+        - --nodes
+        - "3"
+        - --e2e-script
+        - "$(params.e2e-script)"
+        - --e2e-env
+        - "$(params.e2e-env)"
+    workspaces:
+      - name: source
+        workspace: sources
+  finally: 
+  - name: update-github-check
+    taskRef:
+      name: update-github-check-run
+    params:
+    - name: repo-full-name
+      value: $(params.repo-full-name)
+    - name: git-sha
+      value: $(params.git-sha)
+    - name: status
+      value: completed
+    - name: conclusion
+      value: $(tasks.e2e-tests.status)
+    - name: check-run-name
+      value: $(params.check-run-name)
+    - name: jwt-token
+      value: $(tasks.generate-token.results.token)

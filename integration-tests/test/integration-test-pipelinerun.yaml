@@ -1,11 +1,17 @@
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  generateName: kind-e2e-run-
+  generateName: catalog-integration-test-pipeline-run-
 spec:
-  pipelineRef:
-    name: kind-e2e
+  pipelineRef: 
+    name: catalog-integration-test-pipeline
   params:
+  - name: repo-full-name
+    value: QuanZhang-William/my-golang-build
+  - name: git-sha
+    value: 99fe12e9da87a930f7819d6281e66b12b5eb8539
+  - name: check-run-name
+    value: local-pipelinerun-test-1
   - name: pullRequestNumber
     value: 3
   - name: pullRequestBaseRef
@@ -19,6 +25,9 @@ spec:
   - name: e2e-env
     value: ./test/e2e-kind.env
   workspaces:
+  - name: github-app-secret
+    secret:
+      secretName: github-app-secret
   - name: sources
     volumeClaimTemplate:
       spec:
