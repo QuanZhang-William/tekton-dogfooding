@@ -16,9 +16,15 @@ spec:
         params:
         - name: "filter"
           value: "body.comment.body.truncate(10) == '/quan-test'"
+        - name: "overlays"
+          value:
+          - key: truncated_based
+            expression: "body.comment.body.split(' ')[1]"
+          - key: truncated_sha
+            expression: "body.comment.body.split(' ')[2]"
       bindings: # Use a binding here to respond corresponding message
       - name: echo_text
-        value: quans CI echo message
+        value: $(extensions.short_sha)
       template:
         ref: send-basic-comment-github-template
     - name: pull-build-test-trigger-with-interceptors
@@ -79,6 +85,41 @@ spec:
         value: $(body.number)
       - name: pullRequestBaseRef
         value: $(body.pull_request.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
+      - name: e2e-env
+        value: ./test/e2e-kind.env
+    - name: pull-integration-test
+      interceptors:
+      - ref:  # This interceptor filters the event types
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["issue_comment"]
+      - ref:  # This interceptor filters the comment prefix
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.comment.body.truncate(22) == '/pull-integration-test'"
+        - name: "overlays"
+          value:
+          - key: truncated_based
+            expression: "body.comment.body.split(' ')[1]"
+          - key: truncated_sha
+            expression: "body.comment.body.split(' ')[2]"
+      template:
+        ref: catalog-integration-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(extensions.truncated_sha)
+      - name: checkrun-name
+        value: catalog-integration-test
+      - name: pullRequestNumber
+        value: $(body.issue.number)
+      - name: pullRequestBaseRef
+        value: $(extensions.truncated_based)
       - name: gitRepository
         value: $(body.repository.html_url)
       - name: e2e-env
