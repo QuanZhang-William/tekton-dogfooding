@@ -1,0 +1,58 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: catalog-integration-test-template
+spec:
+  params:
+  - name: repo-full-name
+  - name: git-sha
+  - name: checkrun-name
+    default: el-tekton-ci
+  - name: pullRequestNumber
+  - name: pullRequestBaseRef
+  - name: gitRepository
+  - name: k8s-version
+    default: v1.23.x
+  - name: e2e-script
+    default: "test/e2e-tests.sh"
+  - name: e2e-env
+    default: ""
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: catalog-integration-test-template-run
+    spec:
+      pipelineRef:
+        name: catalog-integration-test-pipeline
+      params: 
+      - name: repo-full-name
+        value: $(tt.params.repo-full-name)
+      - name: git-sha
+        value: $(tt.params.git-sha)
+      - name: check-run-name
+        value: $(tt.params.checkrun-name)
+      - name: pullRequestNumber
+        value: $(tt.params.pullRequestNumber)
+      - name: pullRequestBaseRef
+        value: $(tt.params.pullRequestBaseRef)
+      - name: gitRepository
+        value: $(tt.params.gitRepository)
+      - name: k8s-version
+        value: $(tt.params.k8s-version)
+      - name: e2e-script
+        value: $(tt.params.e2e-script)
+      - name: e2e-env
+        value: $(tt.params.e2e-env)
+      workspaces:
+      - name: github-app-secret
+        secret:
+          secretName: github-app-secret
+      - name: sources
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

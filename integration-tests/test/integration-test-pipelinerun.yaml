@@ -9,11 +9,11 @@ spec:
   - name: repo-full-name
     value: QuanZhang-William/my-golang-build
   - name: git-sha
-    value: 99fe12e9da87a930f7819d6281e66b12b5eb8539
+    value: 145feddf8787cbfc4e875f0de29c168d1b02e190
   - name: check-run-name
     value: local-pipelinerun-test-1
   - name: pullRequestNumber
-    value: 3
+    value: 6
   - name: pullRequestBaseRef
     value: main
   - name: gitRepository

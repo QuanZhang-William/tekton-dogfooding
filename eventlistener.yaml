@@ -11,10 +11,6 @@ spec:
         params:
         - name: "eventTypes"
           value: ["pull_request_review_comment", "issue_comment"]
-        - name: "secretRef" # It filters the source of webhook
-          value:
-            secretName: github-secret
-            secretKey: secretToken
       - ref:  # This interceptor filters the comment prefix
           name: "cel"
         params:
@@ -32,33 +28,11 @@ spec:
         params:
         - name: "eventTypes"
           value: ["issue_comment"]
-        - name: "secretRef"
-          value:
-            secretName: github-secret
-            secretKey: secretToken
       - ref:
           name: "cel"
         params:
         - name: "filter"
           value: "body.comment.body.truncate(16) == '/pull-build-test'"
-      template:
-        ref: send-basic-comment-github-template
-    - name: pull-integration-test-trigger-with-interceptors
-      interceptors:
-      - ref:
-          name: "github"
-        params:
-        - name: "eventTypes"
-          value: ["issue_comment"]
-        - name: "secretRef"
-          value:
-            secretName: github-secret
-            secretKey: secretToken
-      - ref:
-          name: "cel"
-        params:
-        - name: "filter"
-          value: "body.comment.body.truncate(22) == '/pull-integration-test'"
       template:
         ref: send-basic-comment-github-template
     - name: open-pr-check-trigger
@@ -68,10 +42,6 @@ spec:
         params:
         - name: "eventTypes"
           value: ["pull_request"]
-        - name: "secretRef"
-          value:
-            secretName: github-app-webhook-secret
-            secretKey: secretToken
       - ref:
           name: "cel"
         params:
@@ -84,6 +54,35 @@ spec:
         value: $(body.repository.full_name)
       - name: git-sha
         value: $(body.pull_request.head.sha)
+    - name: open-pr-integration-test
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["pull_request"]
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.action in ['opened', 'synchronize', 'reopened']"
+      template:
+        ref: catalog-integration-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.pull_request.head.sha)
+      - name: checkrun-name
+        value: catalog-integration-test
+      - name: pullRequestNumber
+        value: $(body.number)
+      - name: pullRequestBaseRef
+        value: $(body.pull_request.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
+      - name: e2e-env
+        value: ./test/e2e-kind.env
   resources:
     kubernetesResource:
       serviceType: LoadBalancer
