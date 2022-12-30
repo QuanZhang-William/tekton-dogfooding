@@ -1,0 +1,77 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: catlin-lint
+spec:
+  description: >-
+    This task detects changes in the pull request using git diff
+    and stores the changed tasks names in a workspace and passes
+    that to the catlin so that catlin can validate only changed
+    files.
+  workspaces:
+    - name: source
+      description: >
+        Workspace where the git repo is prepared for linting and catlin
+        output is stored.
+  params:
+    - name: gitCloneDepth
+      description: Number of commits in the change + 1
+  steps:
+    - name: find-changed-tasks
+      image: docker.io/alpine/git:v2.26.2@sha256:23618034b0be9205d9cc0846eb711b12ba4c9b468efdd8a59aac1d7b1a23363f
+      workingDir: $(workspaces.source.path)
+      env:
+      - name: GIT_CLONE_DEPTH
+        value: $(params.gitCloneDepth)
+      script: |
+        function detect_new_changed_tasks() {
+          # detect for changes in the task manifest
+          git --no-pager diff --name-only HEAD~$(( ${GIT_CLONE_DEPTH} - 1 ))|grep 'task/[^\/]*/[^\/]*/*[^/]*.yaml'|xargs -I {} dirname {}
+        }
+        all_tests=$(detect_new_changed_tasks |sort -u || true)
+        final_tests=""
+        # check for the tasks which are removed completely and skip them
+        for task in $all_tests; do
+          [[ ! -d $task ]] && continue
+          final_tests="$final_tests $task"
+        done
+        echo -n $final_tests > changed-files.txt
+    - name: lint-catalog
+      image: zhangquangg/quan-catlin:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        set +e
+        [[ ! -s changed-files.txt ]] && {
+          echo "No file change detected in task directory"
+          echo -n "No file change detected in task directory" > catlin.txt
+          exit 0
+        }
+        # creating a file which will contain the final formatted output
+        # which needs to be added as a comment(if any)
+        echo '<details><summary>Catlin Output</summary>' >> catlin.txt
+        echo '' >> catlin.txt
+        echo '```' >> catlin.txt
+        # performing catlin validate
+        catlin validate $(cat changed-files.txt) --versioning git | tee -a catlin.txt
+        echo '```' >> catlin.txt
+        echo "</details>" >> catlin.txt
+        # performing catlin script validation only on yaml files
+        for file in $(cat changed-files.txt);do
+          catlin lint script ${file}/*.yaml | tee -a catlin-script.txt
+        done
+        if [[ -s catlin-script.txt ]];then
+          echo '<details><summary>Catlin script lint Output</summary>' >> catlin.txt
+          echo '' >> catlin.txt
+          echo '```' >> catlin.txt
+          cat catlin-script.txt >> catlin.txt
+          echo '```' >> catlin.txt
+        fi
+        # checking if there are any ERROR or WARN messages produced by catlin
+        isWarning=$(cat catlin.txt | grep -c "WARN")
+        isError=$(cat catlin.txt | grep -c "ERROR")
+        # if there are no ERROR or WARN messages then add a empty string which will not
+        # add a comment on the Github PR
+        [[ $isWarning -eq 0 ]] && [[ $isError -eq 0 ]] && \
+        echo -n "" > catlin.txt
+        # if catlin produced the error then fail the task else success
+        [[ $isError -eq 1 ]] && exit 1 || exit 0

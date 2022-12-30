@@ -1,0 +1,146 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: catlin-linter
+spec:
+  description: |
+    This pipeline: 1) generate(sign) JWT;
+    2) start the "catalog-build-test" check
+    3) clone the target repo
+    4) run catlin linitng
+    5) finally, send a comment of linting result and update check to PR
+  workspaces:
+    - name: github-app-secret
+      description: Workspace where the signing private key is stored
+    - name: source
+      description: Workspace where the git repo is prepared for linting.
+  params:
+    - name: repo-full-name
+    - name: git-sha
+    - name: check-run-name
+    - name: k8s-version
+      type: string
+      description: The version of k8s (e.g. v1.21.x, v1.22.x or v1.23.x)
+    - name: e2e-script
+      type: string
+      description: the path to the e2e script in the sources
+      default: "test/e2e-tests.sh"
+    - name: e2e-env
+      type: string
+      description: |
+        the path to an env file that is loaded before the execution
+        of the e2e-script
+      default: ""
+    - name: gitCloneDepth
+      description: Number of commits in the change + 1
+    - name: gitHubCommand
+      description: The command that was used to trigger testing
+    - name: pullRequestUrl
+      description: The HTML URL for the pull request
+    - name: gitRepository
+      description: The git repository that hosts context and Dockerfile
+    - name: pullRequestBaseRef
+      description: The pull request base branch
+    - name: pullRequestNumber
+      description: The pullRequestNumber
+  tasks:
+    - name: generate-token
+      taskRef:
+        resolver: hub
+        params:
+        - name: kind
+          value: task
+        - name: name
+          value: github-app-token
+        - name: version
+          value: "0.2"
+      params:
+      - name: application_id
+        value: "273118"
+      - name: installation_id
+        value: "32269096"
+      workspaces:
+      - name: secrets
+        workspace: github-app-secret
+    - name: start-github-check
+      taskRef:
+        name: update-github-check-run
+      params:
+      - name: repo-full-name
+        value: $(params.repo-full-name)
+      - name: git-sha
+        value: $(params.git-sha)
+      - name: status
+        value: in_progress
+      - name: check-run-name
+        value: $(params.check-run-name)
+      - name: jwt-token
+        value: $(tasks.generate-token.results.token)
+    - name: clone-repo
+      taskRef:
+        resolver: hub
+        params:
+        - name: name
+          value: git-batch-merge
+        - name: version
+          value: "0.2"
+      workspaces:
+        - name: output
+          workspace: source
+      params:
+        - name: url
+          value: $(params.gitRepository)
+        - name: mode
+          value: "merge"
+        - name: revision
+          value: $(params.pullRequestBaseRef)
+        - name: refspec
+          value: refs/heads/$(params.pullRequestBaseRef):refs/heads/$(params.pullRequestBaseRef)
+        - name: batchedRefs
+          value: "refs/pull/$(params.pullRequestNumber)/head"
+    - name: lint-catalog
+      runAfter:
+        - "clone-repo"
+      taskRef:
+        name: catlin-lint
+      workspaces:
+        - name: source
+          workspace: source
+      params:
+        - name: gitCloneDepth
+          value: $(params.gitCloneDepth)
+  finally:
+    - name: post-comment
+      taskRef:
+        resolver: hub
+        params:
+        - name: kind
+          value: task
+        - name: name
+          value: github-add-comment
+        - name: version
+          value: "0.7"
+      params:
+        - name: COMMENT_OR_FILE
+          value: "catlin.txt"
+        - name: REQUEST_URL
+          value: $(params.pullRequestUrl)
+      workspaces:
+      - name: comment-file
+        workspace: source
+    - name: update-github-check
+      taskRef:
+        name: update-github-check-run
+      params:
+      - name: repo-full-name
+        value: $(params.repo-full-name)
+      - name: git-sha
+        value: $(params.git-sha)
+      - name: status
+        value: completed
+      - name: conclusion
+        value: $(tasks.lint-catalog.status)
+      - name: check-run-name
+        value: $(params.check-run-name)
+      - name: jwt-token
+        value: $(tasks.generate-token.results.token)

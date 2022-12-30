@@ -4,7 +4,7 @@ metadata:
   name: catalog-integration-test-pipeline
 spec:
   description: |
-    This pipeline 1)first generate(sign) JWT; 
+    This pipeline: 1)first generate(sign) JWT; 
     2) start a github check; 
     3) clone the target repo; 
     4) run e2e test scripts in the target repo;

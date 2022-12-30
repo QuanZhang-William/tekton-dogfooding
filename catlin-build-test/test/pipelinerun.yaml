@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: catlin-linter-run-
+spec:
+  pipelineRef: 
+    name: catlin-linter
+  params:
+  - name: repo-full-name
+    value: QuanZhang-William/my-golang-build
+  - name: git-sha
+    value: 145feddf8787cbfc4e875f0de29c168d1b02e190
+  - name: check-run-name
+    value: local-catlin-test-1
+  - name: pullRequestNumber
+    value: 6
+  - name: pullRequestBaseRef
+    value: main
+  - name: gitRepository
+    value: https://github.com/QuanZhang-William/my-golang-build
+  - name: k8s-version
+    value: v1.23.x
+  - name: e2e-script
+    value: ./test/e2e-tests.sh
+  - name: e2e-env
+    value: ./test/e2e-kind.env
+  - name: gitCloneDepth
+    value: 9
+  - name: gitHubCommand
+    value: ""
+  - name: pullRequestUrl
+    value: "https://github.com/QuanZhang-William/my-golang-build/pull/6"
+  workspaces:
+  - name: github-app-secret
+    secret:
+      secretName: github-app-secret
+  - name: source
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
