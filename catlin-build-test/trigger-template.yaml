@@ -1,0 +1,51 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: catalog-build-test-template
+spec:
+  params:
+  - name: repo-full-name
+  - name: git-sha
+  - name: check-run-name
+  - name: gitCloneDepth
+  - name: pullRequestUrl
+  - name: gitRepository
+  - name: pullRequestBaseRef
+  - name: pullRequestNumber
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: catalog-build-test-template-run-
+    spec:
+      pipelineRef:
+        name: catlin-linter
+      params: 
+      - name: repo-full-name
+        value: $(tt.params.repo-full-name)
+      - name: git-sha
+        value: $(tt.params.git-sha)
+      - name: check-run-name
+        value: $(tt.params.check-run-name)
+      - name: gitCloneDepth
+        value: $(tt.params.gitCloneDepth)
+      - name: pullRequestUrl
+        value: $(tt.params.pullRequestUrl)
+      - name: gitRepository
+        value: $(tt.params.gitRepository)
+      - name: pullRequestBaseRef
+        value: $(tt.params.pullRequestBaseRef)
+      - name: pullRequestNumber
+        value: $(tt.params.pullRequestNumber)
+      workspaces:
+      - name: github-app-secret
+        secret:
+          secretName: github-app-secret
+      - name: source
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

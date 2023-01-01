@@ -3,8 +3,6 @@ kind: PipelineRun
 metadata:
   generateName: send-basic-comment-github-run
 spec:
-  description: |
-    This is a test pipeline run that can be trigger manually
   pipelineRef:
     name: send-basic-comment-github
   params:

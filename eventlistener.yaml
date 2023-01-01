@@ -60,35 +60,6 @@ spec:
         value: $(body.repository.full_name)
       - name: git-sha
         value: $(body.pull_request.head.sha)
-    - name: open-pr-integration-test
-      interceptors:
-      - ref:
-          name: "github"
-        params:
-        - name: "eventTypes"
-          value: ["pull_request"]
-      - ref:
-          name: "cel"
-        params:
-        - name: "filter"
-          value: "body.action in ['opened', 'synchronize', 'reopened']"
-      template:
-        ref: catalog-integration-test-template
-      bindings:
-      - name: repo-full-name
-        value: $(body.repository.full_name)
-      - name: git-sha
-        value: $(body.pull_request.head.sha)
-      - name: checkrun-name
-        value: catalog-integration-test
-      - name: pullRequestNumber
-        value: $(body.number)
-      - name: pullRequestBaseRef
-        value: $(body.pull_request.base.ref)
-      - name: gitRepository
-        value: $(body.repository.html_url)
-      - name: e2e-env
-        value: ./test/e2e-kind.env
     - name: pull-integration-test
       interceptors:
       - ref:  # This interceptor filters the event types
@@ -124,6 +95,37 @@ spec:
         value: $(body.repository.html_url)
       - name: e2e-env
         value: ./test/e2e-kind.env
+    - name: open-pr-build-test
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["pull_request"]
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.action in ['opened', 'synchronize', 'reopened']"
+      template:
+        ref: catalog-build-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.pull_request.head.sha)
+      - name: check-run-name
+        value: catalog-build-test
+      - name: gitCloneDepth
+        value: $(body.pull_request.commits)
+      - name: pullRequestUrl
+        value: $(body.pull_request.url)
+      - name: pullRequestNumber
+        value: $(body.number)
+      - name: pullRequestBaseRef
+        value: $(body.pull_request.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
   resources:
     kubernetesResource:
       serviceType: LoadBalancer
