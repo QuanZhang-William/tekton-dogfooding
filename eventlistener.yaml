@@ -1,91 +1,9 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
-  name: send-basic-comment-github-event-listener
+  name: tekton-catalog-automated-testing-event-listener
 spec:
   triggers:
-    - name: send-basic-comment-github-trigger-with-interceptors
-      interceptors:
-      - ref:  # This interceptor filters the event types
-          name: "github"
-        params:
-        - name: "eventTypes"
-          value: ["pull_request_review_comment", "issue_comment"]
-      - ref:  # This interceptor filters the comment prefix
-          name: "cel"
-        params:
-        - name: "filter"
-          value: "body.comment.body.truncate(10) == '/quan-test'"
-        - name: "overlays"
-          value:
-          - key: truncated_based
-            expression: "body.comment.body.split(' ')[1]"
-          - key: truncated_sha
-            expression: "body.comment.body.split(' ')[2]"
-      bindings: # Use a binding here to respond corresponding message
-      - name: echo_text
-        value: $(extensions.short_sha)
-      template:
-        ref: send-basic-comment-github-template
-    - name: pull-build-test-trigger-with-interceptors
-      interceptors:
-      - ref:
-          name: "github"
-        params:
-        - name: "eventTypes"
-          value: ["issue_comment"]
-      - ref:
-          name: "cel"
-        params:
-        - name: "filter"
-          value: "body.comment.body == '/test pull-tekton-build-test'"
-        - name: "overlays"
-          value:
-          - key: add_pr_body.pull_request_url
-            expression: "body.issue.pull_request.url"
-      - webhook:
-          objectRef:
-            kind: Service
-            name: add-pr-body
-            apiVersion: v1
-      template:
-        ref: catalog-build-test-template
-      bindings:
-      - name: repo-full-name
-        value: $(body.repository.full_name)
-      - name: git-sha
-        value: $(body.extensions.add_pr_body.pull_request_body.head.sha)
-      - name: check-run-name
-        value: catalog-build-test
-      - name: gitCloneDepth
-        value: $(body.extensions.add_pr_body.pull_request_body.commits)
-      - name: pullRequestUrl
-        value: $(body.issue.pull_request.html_url)
-      - name: pullRequestNumber
-        value: $(body.issue.number)
-      - name: pullRequestBaseRef
-        value: $(body.extensions.add_pr_body.pull_request_body.base.ref)
-      - name: gitRepository
-        value: $(body.repository.html_url)
-    - name: open-pr-check-trigger
-      interceptors:
-      - ref:
-          name: "github"
-        params:
-        - name: "eventTypes"
-          value: ["pull_request"]
-      - ref:
-          name: "cel"
-        params:
-        - name: "filter"
-          value: "body.action == 'opened'"
-      template:
-        ref: send-github-check-template
-      bindings: # Use a binding here to respond corresponding message
-      - name: repo-full-name
-        value: $(body.repository.full_name)
-      - name: git-sha
-        value: $(body.pull_request.head.sha)
     - name: open-pr-integration-test
       interceptors:
       - ref:
@@ -184,10 +102,50 @@ spec:
         value: $(body.pull_request.base.ref)
       - name: gitRepository
         value: $(body.repository.html_url)
+    - name: pull-build-test
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["issue_comment"]
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.comment.body == '/test pull-tekton-build-test'"
+        - name: "overlays"
+          value:
+          - key: add_pr_body.pull_request_url
+            expression: "body.issue.pull_request.url"
+      - webhook:
+          objectRef:
+            kind: Service
+            name: add-pr-body
+            apiVersion: v1
+      template:
+        ref: catalog-build-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.extensions.add_pr_body.pull_request_body.head.sha)
+      - name: check-run-name
+        value: catalog-build-test
+      - name: gitCloneDepth
+        value: $(body.extensions.add_pr_body.pull_request_body.commits)
+      - name: pullRequestUrl
+        value: $(body.issue.pull_request.html_url)
+      - name: pullRequestNumber
+        value: $(body.issue.number)
+      - name: pullRequestBaseRef
+        value: $(body.extensions.add_pr_body.pull_request_body.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
   resources:
     kubernetesResource:
       serviceType: LoadBalancer
       spec:
         template:
           spec:
-            serviceAccountName: send-basic-comment-github-sa
+            serviceAccountName: tekton-catalog-automated-testing-sa
