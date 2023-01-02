@@ -38,9 +38,35 @@ spec:
           name: "cel"
         params:
         - name: "filter"
-          value: "body.comment.body.truncate(16) == '/pull-build-test'"
+          value: "body.comment.body == '/test pull-tekton-build-test'"
+        - name: "overlays"
+          value:
+          - key: add_pr_body.pull_request_url
+            expression: "body.issue.pull_request.url"
+      - webhook:
+          objectRef:
+            kind: Service
+            name: add-pr-body
+            apiVersion: v1
       template:
-        ref: send-basic-comment-github-template
+        ref: catalog-build-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.extensions.add_pr_body.pull_request_body.head.sha)
+      - name: check-run-name
+        value: catalog-build-test
+      - name: gitCloneDepth
+        value: $(body.extensions.add_pr_body.pull_request_body.commits)
+      - name: pullRequestUrl
+        value: $(body.issue.pull_request.html_url)
+      - name: pullRequestNumber
+        value: $(body.issue.number)
+      - name: pullRequestBaseRef
+        value: $(body.extensions.add_pr_body.pull_request_body.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
     - name: open-pr-check-trigger
       interceptors:
       - ref:
@@ -60,6 +86,35 @@ spec:
         value: $(body.repository.full_name)
       - name: git-sha
         value: $(body.pull_request.head.sha)
+    - name: open-pr-integration-test
+      interceptors:
+      - ref:
+          name: "github"
+        params:
+        - name: "eventTypes"
+          value: ["pull_request"]
+      - ref:
+          name: "cel"
+        params:
+        - name: "filter"
+          value: "body.action in ['opened', 'synchronize', 'reopened']"
+      template:
+        ref: catalog-integration-test-template
+      bindings:
+      - name: repo-full-name
+        value: $(body.repository.full_name)
+      - name: git-sha
+        value: $(body.pull_request.head.sha)
+      - name: checkrun-name
+        value: catalog-integration-test
+      - name: pullRequestNumber
+        value: $(body.number)
+      - name: pullRequestBaseRef
+        value: $(body.pull_request.base.ref)
+      - name: gitRepository
+        value: $(body.repository.html_url)
+      - name: e2e-env
+        value: ./test/e2e-kind.env
     - name: pull-integration-test
       interceptors:
       - ref:  # This interceptor filters the event types
@@ -71,26 +126,29 @@ spec:
           name: "cel"
         params:
         - name: "filter"
-          value: "body.comment.body.truncate(22) == '/pull-integration-test'"
+          value: "body.comment.body == '/test pull-tekton-integration-test'"
         - name: "overlays"
           value:
-          - key: truncated_based
-            expression: "body.comment.body.split(' ')[1]"
-          - key: truncated_sha
-            expression: "body.comment.body.split(' ')[2]"
+          - key: add_pr_body.pull_request_url
+            expression: "body.issue.pull_request.url"
+      - webhook:
+          objectRef:
+            kind: Service
+            name: add-pr-body
+            apiVersion: v1
       template:
         ref: catalog-integration-test-template
       bindings:
       - name: repo-full-name
         value: $(body.repository.full_name)
       - name: git-sha
-        value: $(extensions.truncated_sha)
+        value: $(body.extensions.add_pr_body.pull_request_body.head.sha)
       - name: checkrun-name
         value: catalog-integration-test
       - name: pullRequestNumber
         value: $(body.issue.number)
       - name: pullRequestBaseRef
-        value: $(extensions.truncated_based)
+        value: $(body.extensions.add_pr_body.pull_request_body.base.ref)
       - name: gitRepository
         value: $(body.repository.html_url)
       - name: e2e-env
@@ -119,7 +177,7 @@ spec:
       - name: gitCloneDepth
         value: $(body.pull_request.commits)
       - name: pullRequestUrl
-        value: $(body.pull_request.url)
+        value: $(body.pull_request.html_url)
       - name: pullRequestNumber
         value: $(body.number)
       - name: pullRequestBaseRef
