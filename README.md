@@ -1,37 +1,35 @@
-## This folder contains the end-to-end setup for:
-- Set up event listener and trigger to listen PR open action
-- Start a Github Check
-- Run some dummy script simulating a test run
-- Update the status of the Github Check based on the test results
+# Automated Test Infra for Tekton Catalogs
+This repo holds an end-to-end automated test infra setup example for Tekton Catalogs. Catalog authors are welcomed to clone this template and build automted tests for your Catalogs on top of it. 
 
-## Required k8s cluster setup
-### Event Listener
-The PR comment related triggers uses a repo-level webhook, which requires repo webhook secret
+## EventListener & Trigger
+The `eventlistener.yaml` file defines the event listener that listens specific events from Github to trigger the corresponding tests. There are 4 `triggers` defined:
 
-```bash
-k create secret generic github-secret --from-literal=secretToken=<REPO-WEBHOOK-TOKEN>
-```
+### open-pr-build-test
+This `trigger` listens for Github pull request `opened`, `synchronize`, `reopened` events, and triggers the `build test` for the Catalog.
 
-The PR creation related triggers uses a github-app level webhook, which requires a github app webhook secret
+### pull-build-test
+This `trigger` listens for Github comment `/test pull-tekton-build-test` event in the pull request, and triggers the `build test` for the Catalog.
 
-``` bash
-k create secret generic github-app-webhook-secret --from-literal=secretToken=<REPO-WEBHOOK-TOKEN>
-```
+### open-pr-integration-test
+This `trigger` listens for Github pull request `opened`, `synchronize`, `reopened` events, and triggers the `integration test` for the Catalog.
 
-### Post Comment Pipeline
-#### github-add-comment task (not required for github check related)
-The [github-add-comment task](https://hub.tekton.dev/tekton/task/github-add-comment) requires a secret called `github` containing your personal account token to post a comment to a PR:
+### pull-integration-test
+This `trigger` listens for Github comment `/test pull-tekton-integration-test` event in the pull request, and triggers the `integration test` for the Catalog.
 
-``` bash
-kubectl create secret generic github --from-literal token=<PERSONAL-TOKEN>
-```
+## Build Test
+The build tests SHOULD check the syntax of the yaml files and the contract of the Catalog. The resources for build tests are placed under the `./build-tests/` folder.
 
-### Post Check Pipeline
-#### github-app-token
-The [github-app-token task](https://hub.tekton.dev/tekton/task/github-app-token) requires a secret called `github-app-secret` containing the app private key to generate JWT token to interact with GitHub later:
+[Catlin](https://github.com/tektoncd/catlin) is a command-line tool that lints Tekton Resources and Catalogs. This template integrates `Catlin` to the build test pipelines to lint the target Catalog.
 
-``` bash
-k create secret generic github-app-secret --from-file=private.key=./github-checks/privatekey.txt
-```
+## Integration Test
+The integration tests SHOULD run the catalog resource from end to end. The resources for build tests are placed under the `./integration-tests/` folder.
 
+TODO...
 
+## Get Started
+A get started tutorial will be added to help Catalog authors to set up automated tests for your own catalogs.
+
+### Prerequisite
+#### K8s Cluster Setup
+#### Github App Setup
+#### Github Webhook Setup
